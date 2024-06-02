@@ -1,0 +1,48 @@
+#cloud-config
+# Add groups to the system
+# Adds the ubuntu group with members 'root' and 'sys'
+# and the empty group hashicorp.
+# groups:
+#   - ubuntu: [root,sys]
+
+# Add users to the system. Users are added after groups are added.
+# users:
+#   - default
+#   - name: willow
+#     gecos: willow
+#     shell: /bin/bash
+#     sudo: ALL=(ALL) NOPASSWD:ALL
+#     groups: users, admin
+#     #lock_passwd: false
+#     ssh_authorized_keys:
+#       - willow_key
+
+# Downloads the golang package
+#packages:
+#  - 
+
+# Install prerequisities
+runcmd:
+  - "sudo parted /dev/nvme1n1 mklabel gpt mkpart primary 0% 100% --script && sudo mkfs.xfs /dev/nvme1n1p1"
+  - "sudo mv /var/lib /var/lib1 && sudo mkdir /var/lib"
+  - "echo '/dev/nvme1n1p1 /var/lib xfs defaults 0 0' | sudo tee -a /etc/fstab && sudo mount -a"
+  - "sudo mv /var/lib1/* /var/lib/ && sudo rmdir /var/lib1"
+  - "curl https://get.docker.com | sh && sudo systemctl --now enable docker"
+  - "distribution=$(. /etc/os-release;echo $ID$VERSION_ID | sed -e 's/\\.//g')
+    && wget https://developer.download.nvidia.com/compute/cuda/repos/$distribution/x86_64/cuda-keyring_1.0-1_all.deb
+    && sudo dpkg -i cuda-keyring_1.0-1_all.deb && rm cuda-keyring_1.0-1_all.deb"
+  - "distribution=$(. /etc/os-release;echo $ID$VERSION_ID)
+    && curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+    && curl -s -L https://nvidia.github.io/libnvidia-container/$distribution/libnvidia-container.list |
+    sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' |
+    sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list"
+  - "sudo apt-get update"
+  - "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends cuda-drivers nvidia-container-toolkit"
+  - "sudo usermod -aG docker ubuntu"
+  - "sudo nvidia-ctk runtime configure --runtime=docker"
+  - "sudo systemctl restart docker"
+  - "mkdir /var/lib/app && cd /var/lib/app && git clone https://github.com/toverainc/willow-inference-server.git && cd willow-inference-server"
+  - "docker pull kamikac/willow-inference-server:0.6 && docker tag kamikac/willow-inference-server:0.6 willow-inference-server:latest"
+  - "./download_models.sh"
+  - "./gen_cert.sh $(hostname)"
+  - "sudo chown -R ubuntu:ubuntu /var/lib/app"

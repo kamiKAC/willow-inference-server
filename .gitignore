@@ -9,3 +9,6 @@ audio
 custom_speakers
 custom_settings.py
 *.zstd
+terraform/.terraform
+**/willow_rsa
+**/willow_rsa.pub
